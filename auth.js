@@ -1,96 +1,103 @@
-// Passwords (scrypt) and signed session cookies (HMAC-SHA256), using Node's built-in crypto.
-import crypto from "node:crypto";
-import { one } from "./db.js";
-import { HttpError } from "./http.js";
+// Client-side checks give instant feedback; the server repeats every one of them.
+const NAME_PART = /^[\p{L}][\p{L}\p{M} .'’-]*$/u;
+const SECTION = /^[A-Za-z0-9][A-Za-z0-9 .&'-]{0,29}$/;
 
-const COOKIE = "rqs_session";
-const SESSION_DAYS = 7;
-
-function secret() {
-  const s = process.env.SESSION_SECRET;
-  if (!s || s.length < 32) {
-    throw Object.assign(new Error("SESSION_SECRET must be set to a random string of at least 32 characters."), { config: true });
+const validators = {
+  full_name(raw) {
+    const parts = String(raw).trim().split(",").map(p => p.trim());
+    if (parts.length !== 3 || parts.some(p => !p)) return "Enter your name as: Surname, First Name, Middle Name (example: Dela Cruz, Juan, Santos).";
+    if (!parts.every(p => NAME_PART.test(p))) return "Names can only contain letters, spaces, periods, hyphens and apostrophes.";
+    if (parts.join(", ").length > 120) return "Your full name is too long.";
+    return "";
+  },
+  student_id(raw) {
+    const m = String(raw).trim().match(/^grade\s*(\d{1,2})\s*-\s*(.+)$/i);
+    if (!m || +m[1] < 1 || +m[1] > 12 || !SECTION.test(m[2].trim())) return "Enter your grade and section as: Grade - Section (example: Grade 12 - ICT).";
+    return "";
+  },
+  email(raw) {
+    const v = String(raw).trim();
+    return /^[a-z0-9._%+-]+@gmail\.com$/i.test(v) && v.length <= 254 ? "" : "Enter a valid Gmail address ending in @gmail.com.";
+  },
+  phone(raw) {
+    return /^09\d{9}$/.test(String(raw).trim()) ? "" : "Enter an 11-digit mobile number starting with 09 (example: 09123456789).";
+  },
+  password(v) {
+    if (v.length < 6 || v.length > 8) return "Password must be 6 to 8 characters long.";
+    if (!/[A-Za-z]/.test(v) || !/\d/.test(v)) return "Password must include at least one letter and one number.";
+    return "";
   }
-  return s;
+};
+// form field name -> input element id
+const FIELD_IDS = { full_name: "fullName", student_id: "studentId", email: "email", phone: "phone", password: "password", confirm_password: "confirmPassword" };
+
+function setFieldError(name, message) {
+  const id = FIELD_IDS[name];
+  const input = document.getElementById(id), out = document.getElementById(id + "-error");
+  if (!input || !out) return;
+  out.textContent = message || "";
+  if (message) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
 }
 
-const scrypt = (password, salt) =>
-  new Promise((resolve, reject) =>
-    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (err, key) => (err ? reject(err) : resolve(key))));
+document.addEventListener("DOMContentLoaded", async () => {
+  // Already signed in? Go straight to the right dashboard.
+  api("/api/auth/me").then(({ user }) => { location.href = homeFor(user.role); }).catch(() => {});
 
-export async function hashPassword(password) {
-  const salt = crypto.randomBytes(16);
-  const key = await scrypt(password, salt);
-  return `scrypt$${salt.toString("base64")}$${key.toString("base64")}`;
-}
-
-// A fixed hash used when the email doesn't exist, so response timing doesn't reveal registered emails.
-const DUMMY_HASH = "scrypt$AAAAAAAAAAAAAAAAAAAAAA==$" + Buffer.alloc(64).toString("base64");
-
-export async function verifyPassword(password, stored) {
-  const [scheme, saltB64, keyB64] = String(stored || DUMMY_HASH).split("$");
-  if (scheme !== "scrypt" || !saltB64 || !keyB64) return false;
-  const expected = Buffer.from(keyB64, "base64");
-  const actual = await scrypt(password, Buffer.from(saltB64, "base64"));
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual) && Boolean(stored);
-}
-
-const b64url = (buf) => Buffer.from(buf).toString("base64url");
-const sign = (payload) => crypto.createHmac("sha256", secret()).update(payload).digest();
-
-export function createToken(userId) {
-  const payload = b64url(JSON.stringify({ sub: userId, exp: Date.now() + SESSION_DAYS * 86400_000 }));
-  return `${payload}.${b64url(sign(payload))}`;
-}
-
-function readToken(token) {
-  const [payload, sig] = String(token || "").split(".");
-  if (!payload || !sig) return null;
-  const expected = sign(payload);
-  const given = Buffer.from(sig, "base64url");
-  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return null;
-  try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
-    return data.exp > Date.now() ? data : null;
-  } catch { return null; }
-}
-
-function isLocal(req) {
-  const host = String(req.headers.host || "");
-  return host.startsWith("localhost") || host.startsWith("127.0.0.1");
-}
-
-export function setSessionCookie(req, res, userId) {
-  const parts = [`${COOKIE}=${createToken(userId)}`, "Path=/", "HttpOnly", "SameSite=Lax", `Max-Age=${SESSION_DAYS * 86400}`];
-  if (!isLocal(req)) parts.push("Secure");
-  res.setHeader("Set-Cookie", parts.join("; "));
-}
-
-export function clearSessionCookie(req, res) {
-  const parts = [`${COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
-  if (!isLocal(req)) parts.push("Secure");
-  res.setHeader("Set-Cookie", parts.join("; "));
-}
-
-function readCookie(req, name) {
-  for (const part of String(req.headers.cookie || "").split(";")) {
-    const i = part.indexOf("=");
-    if (i > -1 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+  if ($("#loginForm")) {
+    $("#loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); clearMessage();
+      const email = $("#email").value.trim(), password = $("#password").value;
+      if (!email || !password) return showMessage("Enter your email address and password.", "error");
+      const button = $("#loginBtn"); button.disabled = true; button.textContent = "Signing in...";
+      try {
+        const { user } = await api("/api/auth/login", { method: "POST", body: { email, password } });
+        location.href = homeFor(user.role);
+      } catch (error) {
+        showMessage(friendlyError(error), "error"); button.disabled = false; button.textContent = "Log in";
+      }
+    });
   }
-  return null;
-}
 
-/** The signed-in user (role always read fresh from the database), or null. */
-export async function getSessionUser(req) {
-  const data = readToken(readCookie(req, COOKIE));
-  if (!data) return null;
-  return one("select id, email, full_name, student_id, role from users where id = $1::uuid", [data.sub]);
-}
+  if ($("#registerForm")) {
+    const form = $("#registerForm");
+    const values = () => ({
+      full_name: $("#fullName").value, student_id: $("#studentId").value, email: $("#email").value,
+      phone: $("#phone").value, password: $("#password").value, confirm_password: $("#confirmPassword").value
+    });
+    function validateAll(v) {
+      const errors = {};
+      for (const name of Object.keys(validators)) { const msg = validators[name](v[name]); if (msg) errors[name] = msg; }
+      if (!v.confirm_password) errors.confirm_password = "Please re-enter your password.";
+      else if (v.confirm_password !== v.password) errors.confirm_password = "Passwords do not match.";
+      return errors;
+    }
+    // Validate a field when the student leaves it, and clear its error as soon as it becomes valid.
+    for (const [name, id] of Object.entries(FIELD_IDS)) {
+      const input = document.getElementById(id);
+      input.addEventListener("blur", () => { if (input.value) setFieldError(name, validateAll(values())[name]); });
+      input.addEventListener("input", () => { if (input.getAttribute("aria-invalid") && !validateAll(values())[name]) setFieldError(name, ""); });
+    }
 
-/** Require a signed-in user, optionally with one of the given roles. */
-export async function requireUser(req, roles) {
-  const user = await getSessionUser(req);
-  if (!user) throw new HttpError(401, "Please log in first.");
-  if (roles && !roles.includes(user.role)) throw new HttpError(403, "You don't have access to this.");
-  return user;
-}
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); clearMessage();
+      const v = values(), errors = validateAll(v);
+      for (const name of Object.keys(FIELD_IDS)) setFieldError(name, errors[name]);
+      const first = Object.keys(FIELD_IDS).find(n => errors[n]);
+      if (first) { document.getElementById(FIELD_IDS[first]).focus(); return showMessage("Please fix the highlighted fields.", "error"); }
+
+      const button = $("#registerBtn"); button.disabled = true; button.textContent = "Creating account...";
+      try {
+        await api("/api/auth/register", { method: "POST", body: v });
+        showMessage("Account created successfully! Taking you to your dashboard...", "success");
+        button.textContent = "Account created";
+        setTimeout(() => { location.href = "student-dashboard.html"; }, 1500);
+      } catch (error) {
+        showMessage(friendlyError(error), "error");
+        for (const [name, msg] of Object.entries(error.fields || {})) setFieldError(name, msg);
+        const firstServer = Object.keys(error.fields || {})[0];
+        if (firstServer && FIELD_IDS[firstServer]) document.getElementById(FIELD_IDS[firstServer]).focus();
+        button.disabled = false; button.textContent = "Create account";
+      }
+    });
+  }
+});

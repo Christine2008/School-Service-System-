@@ -1,0 +1,14 @@
+{
+  "name": "school-services-queue-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "School Services Queue System on Vercel + Neon Postgres",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node scripts/dev-server.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0"
+  }
+}

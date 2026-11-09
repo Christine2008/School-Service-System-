@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Account | School Services Queue System</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script defer src="js/auth.js"></script>
+</head>
+<body>
+
+<header class="topbar"><a class="brand" href="index.html"><span class="logo" aria-hidden="true">🏛</span><span>School Services Queue System<small>CENTRAL VISAYAN INSTITUTE FOUNDATION</small></span></a></header>
+<main><section class="card form-card"><h1>Create account</h1><p class="subtitle">Register as a student to book queue tickets for school services. All fields are required.</p><div id="message" role="alert" hidden></div>
+<form id="registerForm" novalidate>
+<div class="field"><label for="fullName">Full name</label>
+  <input id="fullName" name="full_name" required autocomplete="name" placeholder="Dela Cruz, Juan, Santos" aria-describedby="fullName-hint fullName-error">
+  <p class="hint" id="fullName-hint">Format: Surname, First Name, Middle Name</p><p class="field-error" id="fullName-error"></p></div>
+<div class="field"><label for="studentId">Student ID (Grade and Section)</label>
+  <input id="studentId" name="student_id" required autocomplete="off" placeholder="Grade 12 - ICT" aria-describedby="studentId-hint studentId-error">
+  <p class="hint" id="studentId-hint">Format: Grade - Section (example: Grade 12 - ICT)</p><p class="field-error" id="studentId-error"></p></div>
+<div class="field"><label for="email">Email address</label>
+  <input id="email" name="email" type="email" required autocomplete="email" inputmode="email" placeholder="juan.delacruz@gmail.com" aria-describedby="email-hint email-error">
+  <p class="hint" id="email-hint">Must be a Gmail address (@gmail.com). You will use it to log in.</p><p class="field-error" id="email-error"></p></div>
+<div class="field"><label for="phone">Phone number</label>
+  <input id="phone" name="phone" type="tel" required autocomplete="tel" inputmode="numeric" placeholder="09XXXXXXXXX" aria-describedby="phone-hint phone-error">
+  <p class="hint" id="phone-hint">Philippine mobile number: 11 digits, starting with 09.</p><p class="field-error" id="phone-error"></p></div>
+<div class="field"><label for="password">Password</label>
+  <input id="password" name="password" type="password" required autocomplete="new-password" aria-describedby="password-hint password-error">
+  <p class="hint" id="password-hint">6 to 8 characters, with at least one letter and one number. Passwords longer than 8 characters are not accepted.</p><p class="field-error" id="password-error"></p></div>
+<div class="field"><label for="confirmPassword">Confirm password</label>
+  <input id="confirmPassword" name="confirm_password" type="password" required autocomplete="new-password" aria-describedby="confirmPassword-error">
+  <p class="field-error" id="confirmPassword-error"></p></div>
+<button class="btn block" id="registerBtn" type="submit">Create account</button>
+</form><p class="muted">Already registered? <a class="link" href="index.html">Log in</a></p></section></main>
+
+</body>
+</html>

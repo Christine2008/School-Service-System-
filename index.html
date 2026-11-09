@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in | School Services Queue System</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script defer src="js/auth.js"></script>
+</head>
+<body>
+
+<header class="topbar"><a class="brand" href="index.html"><span class="logo" aria-hidden="true">🏛</span><span>School Services Queue System<small>CENTRAL VISAYAN INSTITUTE FOUNDATION</small></span></a></header>
+<main><section class="card form-card"><h1>Welcome back</h1><p class="subtitle">Log in to book a queue ticket for a school service or to manage the service queues.</p><div id="message" role="alert" hidden></div>
+<form id="loginForm" novalidate>
+<div class="field"><label for="email">Email address</label><input id="email" type="email" required autocomplete="email" inputmode="email"></div>
+<div class="field"><label for="password">Password</label><input id="password" type="password" required autocomplete="current-password"></div>
+<button class="btn block" id="loginBtn" type="submit">Log in</button>
+</form><p class="muted">New student? <a class="link" href="register.html">Create an account</a></p></section></main>
+
+</body>
+</html>
